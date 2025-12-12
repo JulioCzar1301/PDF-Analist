@@ -48,19 +48,19 @@ class ConsoleView():
 
     def render_error(self, message: str) -> None:
         """Exibe erro em console."""
-        print(f"\n❌ ERRO: {message}\n")
+        print(f"\n ERRO: {message}\n")
 
     def render_page_count(self, count: int) -> None:
         """Exibe contagem de páginas."""
-        print(f"\n📄 Número de páginas: {count}\n")
+        print(f"\n Número de páginas: {count}\n")
 
     def render_word_count(self, count: int) -> None:
         """Exibe contagem de palavras."""
-        print(f"\n📝 Número de palavras: {count}\n")
+        print(f"\n Número de palavras: {count}\n")
 
     def render_vocabulary_size(self, size: int) -> None:
         """Exibe tamanho do vocabulário."""
-        print(f"\n📚 Tamanho do vocabulário: {size} palavras únicas\n")
+        print(f"\n Tamanho do vocabulário: {size} palavras únicas\n")
 
     def render_text_structure(self, text: str) -> None:
         """Exibe resumo da estrutura do texto."""
@@ -69,4 +69,4 @@ class ConsoleView():
 
     def render_success(self, message: str) -> None:
         """Exibe mensagem de sucesso."""
-        print(f"\n✅ {message}\n")
+        print(f"\n {message}\n")
