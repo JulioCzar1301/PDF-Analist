@@ -30,9 +30,8 @@ Data:
 
 from pathlib import Path
 from typing import Any, Dict, Tuple, Union
-
-import pymupdf as fitz
-import os
+import pymupdf
+from src.utils import ImageExtractionConfig, ImageSaveContext
 
 
 def recoverpix(doc: Any, item: Tuple) -> Dict[str, Union[str, int, bytes]]:
@@ -46,15 +45,15 @@ def recoverpix(doc: Any, item: Tuple) -> Dict[str, Union[str, int, bytes]]:
 
     # Caso especial: imagem tem /SMask ou /Mask (transparência)
     if smask > 0:
-        pix0 = fitz.Pixmap(doc.extract_image(xref)["image"])
+        pix0 = pymupdf.Pixmap(doc.extract_image(xref)["image"])
         if pix0.alpha:  # remove canal alpha se já existir
-            pix0 = fitz.Pixmap(pix0, 0)
-        mask = fitz.Pixmap(doc.extract_image(smask)["image"])
+            pix0 = pymupdf.Pixmap(pix0, 0)
+        mask = pymupdf.Pixmap(doc.extract_image(smask)["image"])
 
         try:
-            pix = fitz.Pixmap(pix0, mask)
-        except:  # fallback para imagem original se houver problema
-            pix = fitz.Pixmap(doc.extract_image(xref)["image"])
+            pix = pymupdf.Pixmap(pix0, mask)
+        except (RuntimeError, ValueError, OSError):
+            pix = pymupdf.Pixmap(doc.extract_image(xref)["image"])
 
         if pix0.n > 3:
             ext = "pam"
@@ -70,128 +69,149 @@ def recoverpix(doc: Any, item: Tuple) -> Dict[str, Union[str, int, bytes]]:
     # Caso especial: /ColorSpace customizado
     # Converte para RGB PNG para garantir compatibilidade
     if "/ColorSpace" in doc.xref_object(xref, compressed=True):
-        pix = fitz.Pixmap(doc, xref)
-        pix = fitz.Pixmap(fitz.csRGB, pix)
+        pix = pymupdf.Pixmap(doc, xref)
+        pix = pymupdf.Pixmap(pymupdf.csRGB, pix)
         return {
             "ext": "png",
             "colorspace": 3,
             "image": pix.tobytes("png"),
         }
-    
+
     # Caso padrão: extração direta
     return doc.extract_image(xref)
+
+
+def _should_extract_image(img: Tuple,
+                          xreflist: list,
+                          config: ImageExtractionConfig,
+                          doc: Any) -> bool:
+    """Verifica se uma imagem deve ser extraída baseado nos filtros."""
+    xref = img[0]
+    width = img[2]
+    height = img[3]
+
+    # Verificar se já extraímos esta imagem
+    if xref in xreflist:
+        return False
+
+    # Filtro: dimensão mínima
+    if min(width, height) <= config.dimlimit:
+        print(f"  → Imagem {xref} muito pequena ({width}x{height})")
+        return False
+
+    # Recuperar imagem para obter tamanho
+    image = recoverpix(doc, img)
+    imgdata = image["image"]
+    n = image["colorspace"]
+
+    # Filtro: tamanho absoluto mínimo
+    if len(imgdata) <= config.abssize:
+        print(f"  → Imagem {xref} arquivo muito pequeno ({len(imgdata)} bytes)")
+        return False
+
+    # Filtro: tamanho relativo (densidade)
+    if width * height * n > 0:  # evitar divisão por zero
+        if len(imgdata) / (width * height * n) <= config.relsize:
+            print(f"  → Imagem {xref} densidade muito baixa")
+            return False
+
+    return True
 
 
 def extract_images_from_pdf(
     pdf_path: Union[str, Path],
     output_dir: Union[str, Path],
-    dimlimit: int = 0,
-    relsize: float = 0.0,
-    abssize: int = 0,
-) -> Dict[str, Union[int, str]]:
+    config: ImageExtractionConfig = None,
+) -> Dict[str, Union[int, str, None]]:
     """
     Extrai imagens de um arquivo PDF com filtros opcionais.
-    
+
     Parâmetros:
     -----------
     pdf_path : str
         Caminho do arquivo PDF
     output_dir : str
         Diretório de saída
-    dimlimit : int
-        Dimensão mínima (largura ou altura). Ex: 100 = ignora imagens < 100px
-    relsize : float
-        Tamanho relativo mínimo. Ex: 0.05 = ignora se < 5% do tamanho teórico
-    abssize : int
-        Tamanho absoluto mínimo em bytes. Ex: 2048 = ignora se < 2KB
+    config : ImageExtractionConfig, optional
+        Configuração de filtros de extração. Usa valores padrão se None.
+
+    Exemplo:
+        config = ImageExtractionConfig(dimlimit=100, abssize=2048, relsize=0.05)
+        extract_images_from_pdf("doc.pdf", "output/", config)
     """
+    if config is None:
+        config = ImageExtractionConfig()
+
     try:
-        # Nome do arquivo PDF (ex: 'artigo')
-        pdf_filename: str = Path(pdf_path).stem  # sem extensão
-
-        # Criar pasta de saída
-        output_path: Path = Path(output_dir) / pdf_filename
-        output_path.mkdir(parents=True, exist_ok=True)
-
-        # Abrir PDF
-        doc = fitz.open(str(pdf_path))
+        # Preparar caminho base (sem criar a pasta ainda)
+        output_path = Path(output_dir) / Path(pdf_path).stem
+        folder_created = False
         
-        # Lista para evitar duplicatas (mesma imagem em várias páginas)
-        xreflist: list[int] = []
-        total_images: int = 0
-        extracted_images: int = 0
-        
-        # Iterar por cada página
-        for page_num in range(len(doc)):
-            page = doc[page_num]
-            
-            # Obter lista de imagens da página (com informações completas)
+        # Abrir PDF e processar
+        doc = pymupdf.open(str(pdf_path))
+        xreflist = []
+        stats = {"total": 0, "extracted": 0, "output_path": None}
+
+        for page_num, page in enumerate(doc):
             image_list = page.get_images(full=True)
-            total_images += len(image_list)
-            
-            print(f"Página {page_num + 1}: {len(image_list)} imagem(ns) encontrada(s)")
-            
+            stats["total"] += len(image_list)
+
             for img_index, img in enumerate(image_list):
-                xref: int = img[0]
-                
-                # Verificar se já extraímos esta imagem
-                if xref in xreflist:
-                    print(f"  → Imagem {xref} já extraída (duplicata)")
+                if not _should_extract_image(img, xreflist, config, doc):
                     continue
-                
-                # Obter dimensões
-                width: int = img[2]
-                height: int = img[3]
-                
-                # Filtro: dimensão mínima
-                if min(width, height) <= dimlimit:
-                    print(f"  → Imagem {xref} muito pequena ({width}x{height})")
-                    continue
-                
-                # Recuperar imagem (com tratamento de casos especiais)
-                image = recoverpix(doc, img)
-                n: int = image["colorspace"]
-                imgdata: bytes = image["image"]
-                
-                # Filtro: tamanho absoluto mínimo
-                if len(imgdata) <= abssize:
-                    print(f"  → Imagem {xref} arquivo muito pequeno ({len(imgdata)} bytes)")
-                    continue
-                
-                # Filtro: tamanho relativo (densidade)
-                if width * height * n > 0:  # evitar divisão por zero
-                    if len(imgdata) / (width * height * n) <= relsize:
-                        print(f"  → Imagem {xref} densidade muito baixa")
-                        continue
-                
-                # Salvar imagem
-                imgfile: Path = output_path / f"page_{page_num + 1}_img_{img_index + 1}_xref_{xref}.{image['ext']}"
-                
-                with open(imgfile, "wb") as fout:
-                    fout.write(imgdata)
-                
-                xreflist.append(xref)
-                extracted_images += 1
-                
-                print(f"  ✓ {imgfile.name} ({width}x{height}px, {len(imgdata)/1024:.1f}KB)")
-        
+
+                # Criar pasta apenas quando for salvar a primeira imagem
+                if not folder_created:
+                    output_path.mkdir(parents=True, exist_ok=True)
+                    folder_created = True
+                    stats["output_path"] = str(output_path)
+                    print(f"✓ Pasta criada: {output_path}")
+
+                context = ImageSaveContext(
+                    img=img, doc=doc, output_path=output_path,
+                    page_num=page_num, img_index=img_index, xreflist=xreflist
+                )
+                stats["extracted"] += _extract_and_save_image(context)
+
         doc.close()
         
-        # Resumo
-        print(f"\n{'='*60}")
-        print(f"PDF: {pdf_filename}")
-        print(f"Total de imagens no documento: {total_images}")
-        print(f"Imagens únicas encontradas: {len(set(xreflist))}")
-        print(f"Imagens extraídas: {extracted_images}")
-        print(f"Pasta de saída: {output_path}")
-        print(f"{'='*60}")
+        # Se nenhuma imagem foi extraída, informar e não criar pasta
+        if stats["extracted"] == 0:
+            print(f"\n⚠ Nenhuma imagem foi extraída do PDF.")
+            print(f"Motivos possíveis:")
+            print(f"  • PDF não contém imagens")
+            print(f"  • Todas as imagens foram filtradas pelos critérios:")
+            print(f"    - dimlimit={config.dimlimit} (dimensão mínima)")
+            print(f"    - abssize={config.abssize} (tamanho mínimo em bytes)")
+            print(f"    - relsize={config.relsize} (densidade mínima)")
+            print(f"  • Pasta não foi criada pois não há imagens para salvar")
         
-        return {
-            "total": total_images,
-            "extracted": extracted_images,
-            "output_path": str(output_path),
-        }
-        
-    except Exception as e:
-        print(f"Erro ao extrair imagens: {e}")
+        return stats
+
+    except FileNotFoundError as e:
+        print(f"Erro: Arquivo PDF não encontrado: {e}")
         raise
+    except OSError as e:
+        print(f"Erro ao acessar arquivo: {e}")
+        raise
+
+
+def _extract_and_save_image(context: ImageSaveContext) -> int:
+    """Extrai e salva uma imagem, retornando 1 se bem-sucedido, 0 caso contrário."""
+    image = recoverpix(context.doc, context.img)
+    xref = context.img[0]
+    width = context.img[2]
+    height = context.img[3]
+    imgdata = image["image"]
+
+    # Salvar imagem
+    image_page = f"page_{context.page_num + 1}_img_{context.img_index + 1}.{image['ext']}"
+    imgfile = context.output_path / image_page
+
+    with open(imgfile, "wb") as fout:
+        fout.write(imgdata)
+
+    context.xreflist.append(xref)
+    print(f"  ✓ {imgfile.name} ({width}x{height}px, {len(imgdata)/1024:.1f}KB)")
+
+    return True

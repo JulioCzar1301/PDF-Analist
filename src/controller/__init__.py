@@ -1,4 +1,14 @@
-from typing import List
-from .controller import Controller
+"""
+src/controller/__init__.py
 
-__all__: List[str] = ["Controller"]
+Inicialização do pacote controller.
+
+"""
+
+from .controller import Controller
+from .logger_config import setup_logging
+
+__all__ = [
+    'Controller',
+    'setup_logging'
+]

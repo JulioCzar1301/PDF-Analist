@@ -1,16 +1,18 @@
 """
 Main entry point for PDF analysis application.
 
-This module initializes the CLI argument parser and controller
-to orchestrate PDF extraction, cleaning, and analysis operations.
+Este mnodulo inicia o logging, o CLI e o Controller
 """
 
 from src.cli import create_parser
 from src.controller import Controller
-
+from src.controller import setup_logging
 
 def main():
-    """Parse command-line arguments and execute controller logic."""
+    """Execução e controle do sistema"""
+
+    setup_logging()
+
     args = create_parser()
     controller = Controller()
     controller.run(args)
