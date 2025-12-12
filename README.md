@@ -140,10 +140,8 @@ python main.py documento.pdf -text_structure
 - Consolidação automática de resumos parciais
 - Tratamento de exceções robusto
 
-✅ **Limpeza e normalização avançada**
+✅ **Limpeza e normalização**
 - Remoção de caracteres especiais
-- Normalização de espaços e quebras de linha
-- Tratamento de encoding
 - Remoção de stopwords do português brasileiro
 
 ✅ **Sistema de logs completo**
@@ -154,7 +152,6 @@ python main.py documento.pdf -text_structure
 ✅ **Relatório unificado em Markdown**
 - Comando `-final_resume` gera documento completo
 - Inclui todas as análises em um único arquivo
-- Formato profissional e organizado
 
 ```bash
 python main.py documento.pdf -final_resume
@@ -181,8 +178,6 @@ python main.py documento.pdf -final_resume
 
 ### 2. Domínio de Python
 - **Orientação a objetos**: Classes bem estruturadas (`Summarizer`, `Controller`)
-- **List comprehensions**: Uso eficiente de estruturas pythônicas
-- **Context managers**: Gerenciamento adequado de recursos
 - **Bibliotecas padrão**: Uso eficiente de `argparse`, `pathlib`, `logging`, `typing`
 - **Tratamento de erros**: Try-except estratégicos para robustez
 
@@ -200,11 +195,12 @@ python main.py documento.pdf -final_resume
 - **Escalabilidade**: Fácil adicionar novas funcionalidades
 
 ### 5. Fidelidade ao escopo
-- ✅ **Todas as funcionalidades obrigatórias implementadas**
-- ✅ **Análise sem IA**: Contagem e frequência com bibliotecas Python puras
-- ✅ **Extração de imagens**: Com nomes únicos e diretório configurável
-- ✅ **LLM local**: Qwen 3B da Hugging Face, sem APIs externas
-- ✅ **Saída padrão**: Todas as informações exibidas no terminal
+-  **Todas as funcionalidades obrigatórias implementadas**
+-  **Respeito as tecnologias permitidas**: Não teve o uso de bibliotecas de normalização como NLTK,Spacy e nem Ollama para carregar o modelo.
+-  **Análise sem IA**: Contagem e frequência com bibliotecas Python puras
+-  **Extração de imagens**: Com nomes únicos e diretório configurável
+-  **LLM local**: Qwen 3B da Hugging Face, sem APIs externas
+-  **Saída padrão**: Todas as informações exibidas no terminal
 
 ### 6. Funcionalidades extras (diferenciais)
 
@@ -218,7 +214,6 @@ python main.py documento.pdf -final_resume
 2. **Sistema de logs profissional**
    - Arquivo de log estruturado
    - Rastreamento completo de operações
-   - Útil para debug e auditoria
 
 3. **Detecção de estrutura avançada**
    - Identificação automática de hierarquia
@@ -231,21 +226,13 @@ python main.py documento.pdf -final_resume
    - Fácil compartilhamento
 
 5. **Normalização robusta de texto**
-   - Limpeza avançada de caracteres
-   - Tratamento de encoding
+   - Limpeza de caracteres
    - Remoção inteligente de stopwords
 
 6. **Configurabilidade total**
    - Filtros de imagem ajustáveis
    - Diretórios personalizáveis
    - Parâmetros flexíveis via CLI
-
-**Por que avaliar esses diferenciais:**
-- Demonstram compreensão profunda de processamento de texto
-- Mostram capacidade de resolver problemas complexos (textos grandes)
-- Evidenciam preocupação com usabilidade e manutenibilidade
-- Aplicam conceitos avançados (Map-Reduce, gestão de contexto de LLMs)
-- Tornam o sistema robusto e pronto para produção
 
 ## 💻 Uso
 
@@ -409,18 +396,6 @@ deactivate
 - O relatório final será gerado em formato Markdown
 - Logs detalhados são salvos automaticamente em `./logs/app.log`
 
-## ⚙️ Funcionalidades técnicas
-
-### Geração de resumos com LLM
-
-O sistema utiliza um modelo de linguagem local (LLM) para gerar resumos inteligentes:
-
-- **Modelo**: Qwen 3B (configurável)
-- **Chunking automático**: Textos grandes são divididos automaticamente em chunks processáveis
-- **Consolidação**: Múltiplos resumos são consolidados em um resumo final coerente
-- **Limites de token**: Sistema verifica automaticamente se o texto cabe na janela de contexto
-- **Parâmetros otimizados**: Temperature 0.3, top_k 40, top_p 0.9 para resumos consistentes
-
 ### 🗺️ Arquitetura Map-Reduce para Resumos
 
 O sistema implementa uma estratégia **Map-Reduce** para processar documentos que excedem o limite de tokens do modelo:
@@ -477,14 +452,6 @@ Resumo 1 Resumo 2 Resumo 3 Resumo N
     "do_sample": True             # Habilita amostragem probabilística
 }
 ```
-
-**Por que Qwen 3B?**
-
-- ✅ Roda localmente sem necessidade de GPU de alto desempenho
-- ✅ Boa compreensão de português brasileiro
-- ✅ Janela de contexto generosa (32k tokens)
-- ✅ Balance ideal entre velocidade e qualidade
-- ✅ Suporte a chat templates para prompts estruturados
 
 ## 📄 Licença
 
